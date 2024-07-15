@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:wefgis_app/screen/map_add.dart';
+import 'package:wefgis_app/screen/main_home.dart';
+
 import 'package:wefgis_app/screen/map_screen.dart';
 
 void main() {
@@ -19,11 +20,11 @@ class _MyAppState extends State<MyApp> {
     return  MaterialApp(
       title: 'Wefgis App',
       debugShowCheckedModeBanner: false,
-      initialRoute: '/',
+      initialRoute: '/map',
       routes: {
-        '/': (context) => const MapScreen(),
+        '/': (context) => HistoriListPage(),
         '/map': (context) => const MapScreen(),
-        '/mapAdd' :(context) => const MapFormScreen()
+        // '/mapAdd' :(context) => const MapFormScreen()
       },
     );
   }

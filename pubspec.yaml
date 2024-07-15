@@ -37,6 +37,8 @@ dependencies:
   flutter_map: ^5.0.0
   latlong2: ^0.9.1
   geocoding: ^3.0.0
+  http: ^1.2.1
+  flutter_map_marker_popup: ^5.0.0
 
 dev_dependencies:
   flutter_test:

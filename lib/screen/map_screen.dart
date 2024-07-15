@@ -1,14 +1,15 @@
 // map_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:wefgis_app/model/histori_banjir_model.dart';
 import 'package:wefgis_app/model/location_model.dart';
 import 'package:wefgis_app/screen/map_add.dart';
 import 'package:wefgis_app/service/histori_banjir_service.dart';
-import 'package:wefgis_app/widget/modal_map_controller.dart'; // Pastikan path ini sesuai dengan path di proyek Anda
+import 'package:wefgis_app/widget/modal_map_controller.dart';
 import 'package:flutter_map_marker_popup/flutter_map_marker_popup.dart';
-
+import 'package:wefgis_app/screen/histori_detail_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -20,7 +21,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final List<LocationModel> _locations = [];
   final MapController _mapController = MapController();
-   final PopupController _popupController = PopupController();
+  // final PopupController _popupController = PopupController();
   double _currentZoom = 10;
 
   List<HistoriData> _historiData = [];
@@ -54,7 +55,8 @@ class _MapScreenState extends State<MapScreen> {
     final LocationModel? location = await Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (context) => MapFormScreen(initialPoint: initialPoint)),
+        builder: (context) => MapFormScreen(initialPoint: initialPoint),
+      ),
     );
 
     if (location != null) {
@@ -81,48 +83,133 @@ class _MapScreenState extends State<MapScreen> {
               center: const LatLng(-8.197707726277871, 115.16227460197047),
               enableMultiFingerGestureRace: true,
               zoom: _currentZoom,
-                onTap: (_, __) => _popupController.hideAllPopups(),
             ),
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.app',
               ),
-              // MarkerLayer(
-              //   markers: _locations.map((location) {
-              //     return Marker(
-              //       width: 80.0,
-              //       height: 80.0,
-              //       point: location.point,
-              //       builder: (ctx) => Container(
-              //         child: const Icon(Icons.location_on,
-              //             color: Colors.red, size: 40.0),
-              //       ),
-              //     );
-              //   }).toList(),
-              // ),
               MarkerLayer(
-                markers: _historiData
-                    .map((histori) {
-                      final coords = histori.koordinat
-                          ?.split(',')
-                          .map((e) => double.tryParse(e.trim()))
-                          .toList();
-                      if (coords == null ||
-                          coords.length != 2 ||
-                          coords.contains(null)) return null;
-                      return Marker(
-                        width: 80.0,
-                        height: 80.0,
-                        point: LatLng(coords[0]!, coords[1]!),
-                        builder: (ctx) => Container(
-                          child: const Icon(Icons.location_on,
-                              color: Colors.red, size: 40.0),
+                markers: _locations.map((location) {
+                  return Marker(
+                    point: location.point,
+                    builder: (ctx) => Container(
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Colors.red,
+                        size: 40.0,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              PopupMarkerLayer(
+                options: PopupMarkerLayerOptions(
+                  markers: _historiData
+                      .map((histori) {
+                        final coords = histori.koordinat
+                            ?.split(',')
+                            .map((e) => double.tryParse(e.trim()))
+                            .toList();
+                        if (coords == null ||
+                            coords.length != 2 ||
+                            coords.contains(null)) return null;
+
+                        return Marker(
+                          point: LatLng(coords[0]!, coords[1]!),
+                          builder: (ctx) => Container(
+                            child: const Icon(
+                              Icons.location_on,
+                              color: Colors.red,
+                              size: 40.0,
+                            ),
+                          ),
+                        );
+                      })
+                      .whereType<Marker>()
+                      .toList(),
+                  popupDisplayOptions: PopupDisplayOptions(
+                    builder: (BuildContext context, Marker marker) {
+                      // Mencari data histori berdasarkan koordinat marker yang dipilih
+                      final historiData = _historiData.firstWhere(
+                        (data) {
+                          final coords = data.koordinat
+                              ?.split(',')
+                              .map((e) => double.tryParse(e.trim()))
+                              .toList();
+                          return coords != null &&
+                              coords.length == 2 &&
+                              !coords.contains(null) &&
+                              LatLng(coords[0]!, coords[1]!) == marker.point;
+                        },
+                        orElse: () => HistoriData(
+                          // Menampilkan data kosong jika tidak ada data yang cocok
+                          keterangan: '',
+                          koordinat: '',
                         ),
                       );
-                    })
-                    .whereType<Marker>()
-                    .toList(),
+
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => HistoriDetailScreen(
+                                historiData: historiData,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            maxHeight: 150.0, // Ubah sesuai kebutuhan
+                            maxWidth: 250.0, // Ubah sesuai kebutuhan
+                          ),
+                          padding: const EdgeInsets.all(
+                              12.0), // Menambahkan padding di dalam container
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(
+                                12.0), // Menambahkan sudut rounded
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 6,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              // Text(
+                              //   'Tanggal: ${historiData.tanggal}', // Menampilkan tanggal histori banjir
+                              //   style: Theme.of(context).textTheme.subtitle1,
+                              // ),
+                              Text(
+                                  "jenis Kejadian : ${historiData.jenisKejadian}"),
+                              const SizedBox(height: 10),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => HistoriDetailScreen(
+                                        historiData: historiData,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: const Text(
+                                    'Lihat Detail'), // Tombol untuk melihat detail histori banjir
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               )
             ],
           ),
