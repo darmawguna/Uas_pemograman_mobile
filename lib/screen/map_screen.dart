@@ -1,7 +1,14 @@
+// map_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:wefgis_app/model/histori_banjir_model.dart';
+import 'package:wefgis_app/model/location_model.dart';
+import 'package:wefgis_app/screen/map_add.dart';
+import 'package:wefgis_app/service/histori_banjir_service.dart';
 import 'package:wefgis_app/widget/modal_map_controller.dart'; // Pastikan path ini sesuai dengan path di proyek Anda
+import 'package:flutter_map_marker_popup/flutter_map_marker_popup.dart';
+
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -11,16 +18,12 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final List<LatLng> floodPoints = [
-    const LatLng(-8.240004857164257, 115.1266612161339), // Jakarta
-    const LatLng(-8.279360626503047, 115.17889418202755), // Surabaya
-    const LatLng(-8.2746616365954, 115.38723248917154), // Bandung
-    const LatLng(-8.259039643919046, 115.09435086455711), // Bali
-  ];
-  double _currentZoom = 10;
+  final List<LocationModel> _locations = [];
   final MapController _mapController = MapController();
- 
+   final PopupController _popupController = PopupController();
+  double _currentZoom = 10;
 
+  List<HistoriData> _historiData = [];
   void _zoomIn() {
     setState(() {
       _currentZoom++;
@@ -35,6 +38,38 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  Future<void> _fetchHistoriData() async {
+    try {
+      final data = await HistoriService().getAllHistory();
+      setState(() {
+        _historiData = data;
+      });
+    } catch (e) {
+      print('Failed to fetch histori data: $e');
+    }
+  }
+
+  Future<void> _navigateToAddLocation() async {
+    final LatLng initialPoint = _mapController.center;
+    final LocationModel? location = await Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (context) => MapFormScreen(initialPoint: initialPoint)),
+    );
+
+    if (location != null) {
+      setState(() {
+        _locations.add(location);
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHistoriData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -46,26 +81,49 @@ class _MapScreenState extends State<MapScreen> {
               center: const LatLng(-8.197707726277871, 115.16227460197047),
               enableMultiFingerGestureRace: true,
               zoom: _currentZoom,
+                onTap: (_, __) => _popupController.hideAllPopups(),
             ),
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.app',
               ),
+              // MarkerLayer(
+              //   markers: _locations.map((location) {
+              //     return Marker(
+              //       width: 80.0,
+              //       height: 80.0,
+              //       point: location.point,
+              //       builder: (ctx) => Container(
+              //         child: const Icon(Icons.location_on,
+              //             color: Colors.red, size: 40.0),
+              //       ),
+              //     );
+              //   }).toList(),
+              // ),
               MarkerLayer(
-                markers: floodPoints.map((point) {
-                  return Marker(
-                    width: 80.0,
-                    height: 80.0,
-                    point: point,
-                    builder: (ctx) => Container(
-                      child: const Icon(Icons.location_on,
-                          color: Colors.red, size: 40.0),
-                    ),
-                  );
-                }).toList(),
-              ),
-              
+                markers: _historiData
+                    .map((histori) {
+                      final coords = histori.koordinat
+                          ?.split(',')
+                          .map((e) => double.tryParse(e.trim()))
+                          .toList();
+                      if (coords == null ||
+                          coords.length != 2 ||
+                          coords.contains(null)) return null;
+                      return Marker(
+                        width: 80.0,
+                        height: 80.0,
+                        point: LatLng(coords[0]!, coords[1]!),
+                        builder: (ctx) => Container(
+                          child: const Icon(Icons.location_on,
+                              color: Colors.red, size: 40.0),
+                        ),
+                      );
+                    })
+                    .whereType<Marker>()
+                    .toList(),
+              )
             ],
           ),
           Positioned(
@@ -151,12 +209,10 @@ class _MapScreenState extends State<MapScreen> {
             bottom: 50,
             right: 10,
             child: FloatingActionButton(
-              onPressed: () {
-               Navigator.pushNamed(context, '/mapAdd');
-              },
+              onPressed: _navigateToAddLocation,
               child: const Icon(Icons.add),
             ),
-          )
+          ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
